@@ -13,6 +13,7 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 import com._42six.amino.common.HadoopConfigurationUtils;
+import org.apache.hadoop.mapreduce.task.JobContextImpl;
 
 public class AminoInputFormat extends InputFormat<MapWritable, MapWritable> {
 
@@ -61,9 +62,7 @@ public class AminoInputFormat extends InputFormat<MapWritable, MapWritable> {
 			loader.initializeFormat(myJob);
 			@SuppressWarnings("rawtypes")
 			InputFormat inputFormat = loader.getInputFormat();
-			List<InputSplit> retVal = inputFormat.getSplits(new JobContext(
-					myJob.getConfiguration(), myJob.getJobID()));
-			return retVal;
+            return inputFormat.getSplits(new JobContextImpl(myJob.getConfiguration(), myJob.getJobID()));
 		} catch (ClassNotFoundException e) {
 			throw new IOException(e);
 		} catch (InstantiationException e) {

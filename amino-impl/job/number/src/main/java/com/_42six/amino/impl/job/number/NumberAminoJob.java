@@ -18,6 +18,8 @@ import com._42six.amino.impl.dataloader.number.NumberLoader;
 
 public class NumberAminoJob implements AminoJob {
 
+    Configuration configuration;
+
 	@Override
 	public Class<? extends DataLoader> getDataLoaderClass() 
 	{
@@ -69,8 +71,7 @@ public class NumberAminoJob implements AminoJob {
 
 	@Override
 	public void setConfig(Configuration config) {
-		// TODO Auto-generated method stub
-		
+		this.configuration = config;
 	}
 
 }

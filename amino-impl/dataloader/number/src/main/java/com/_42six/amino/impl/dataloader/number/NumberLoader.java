@@ -34,33 +34,32 @@ public class NumberLoader implements DataLoader {
 		bucketsAndDisplayNames.put(new Text("number"), new Text("number"));
 		bucketsAndDisplayNames.put(new Text("number2"), new Text("number2"));
 	}
-	
+
+    @Override
 	public InputFormat getInputFormat() {
-		// TODO Auto-generated method stub
 		return new TextInputFormat();
 	}
 
+    @Override
 	public void initializeFormat(Job job) throws IOException {
-		// TODO Auto-generated method stub
-		Configuration conf = job.getConfiguration();
+		final Configuration conf = job.getConfiguration();
 		AminoConfiguration.loadDefault(conf, NumberLoader.class.getSimpleName(), true);
 		dataLoc = conf.get("data.location");
-		FileInputFormat.setInputPaths(job,
-				dataLoc);
+		FileInputFormat.setInputPaths(job, dataLoc);
 		number2Max = conf.getInt("number2-max", 500);
 	}
 
+    @Override
 	public MapWritable getNext() throws IOException {
-		// TODO Auto-generated method stub
-		Text val = null;
 		try {
 			// We have nothing else so return null
 			if (!this.reader.nextKeyValue()) {
 				return null;
 			}
-			MapWritable retVal = new MapWritable();
+
 			// Parse our data
-			val = (Text) reader.getCurrentValue();
+			final MapWritable retVal = new MapWritable();
+			final Text val = (Text) reader.getCurrentValue();
 			retVal.put(new Text("number"), new Text(val.toString()));
 			int twoVal = Integer.parseInt(val.toString());
 			if (twoVal <= number2Max)
@@ -73,25 +72,27 @@ public class NumberLoader implements DataLoader {
 		}
 	}
 
+    @Override
 	public List<Text> getBuckets() {
-		// TODO Auto-generated method stub
 		return new LinkedList<Text>(NumberLoader.bucketsAndDisplayNames.keySet());
 	}
 
+    @Override
 	public Hashtable<Text, Text> getBucketDisplayNames() {
-		// TODO Auto-generated method stub
 		return NumberLoader.bucketsAndDisplayNames;
 	}
 
+    @Override
 	public String getDataSourceName() {
-		// TODO Auto-generated method stub
 		return "numbers";
 	}
 
+    @Override
 	public void setRecordReader(RecordReader recordReader) throws IOException {
 		this.reader = recordReader;
 	}
 
+    @Override
 	public void setConfig(Configuration config) {
 		this.config = config;
 	}
@@ -115,7 +116,7 @@ public class NumberLoader implements DataLoader {
 	@Override
 	public boolean canReadFrom(InputSplit inputSplit) 
 	{
-		FileSplit fs = (FileSplit)inputSplit;
+		final FileSplit fs = (FileSplit) inputSplit;
 		if (fs.getPath().toString().contains(dataLoc))
 		{
 			System.out.println("true");

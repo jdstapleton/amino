@@ -15,10 +15,7 @@ import org.apache.accumulo.core.client.admin.TableOperations;
 import org.apache.accumulo.core.client.mapreduce.AccumuloInputFormat;
 import org.apache.accumulo.core.client.mapreduce.AccumuloOutputFormat;
 import org.apache.accumulo.core.client.security.tokens.PasswordToken;
-import org.apache.accumulo.core.data.Key;
-import org.apache.accumulo.core.data.Mutation;
-import org.apache.accumulo.core.data.Range;
-import org.apache.accumulo.core.data.Value;
+import org.apache.accumulo.core.data.*;
 import org.apache.accumulo.core.security.Authorizations;
 import org.apache.accumulo.core.security.ColumnVisibility;
 import org.apache.accumulo.core.util.Pair;
@@ -27,6 +24,7 @@ import org.apache.commons.math3.stat.descriptive.moment.Mean;
 import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -77,8 +75,8 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 
     private static class DateHandler extends FeatureHandler {
         private FeatureFactTranslatorInt translator = new FeatureFactTranslatorImpl();
-        private Hashtable<String, String> min = new Hashtable<String, String>();
-        private Hashtable<String, String> max = new Hashtable<String, String>();
+        private Hashtable<String, BytesWritable> min = new Hashtable<String, BytesWritable>();
+        private Hashtable<String, BytesWritable> max = new Hashtable<String, BytesWritable>();
 
         protected DateHandler(FeatureMetadata meta) {
             super(new DateFeatureMetadata(meta));
@@ -91,7 +89,7 @@ public final class FeatureMetadataJob extends Configured implements Tool {
         public void handle(Scanner scanner) {
             for (Entry<Key, Value> entry : scanner) {
                 final String columnType = entry.getKey().getColumnQualifier().toString();
-                final String date = entry.getKey().getColumnFamily().toString();
+                final BytesWritable date = new BytesWritable(entry.getKey().getColumnFamilyData().toArray());
 
                 if (columnType.contains("COUNT")) {
                     final long count = Long.parseLong(entry.getValue().toString());
@@ -102,8 +100,8 @@ public final class FeatureMetadataJob extends Configured implements Tool {
                     meta.addToBucketValueCount(bucket, count);
 
                     // Get (possibly set) the min/max
-                    String minDate = min.get(bucket);
-                    String maxDate = max.get(bucket);
+                    BytesWritable minDate = min.get(bucket);
+                    BytesWritable maxDate = max.get(bucket);
 
                     if (minDate == null) {
                         minDate = date;
@@ -127,10 +125,10 @@ public final class FeatureMetadataJob extends Configured implements Tool {
         @Override
         public void summarize() {
             DateFeatureMetadata dmeta = (DateFeatureMetadata)this.meta;
-            for (Entry<String, String> entry : min.entrySet()) {
+            for (Entry<String, BytesWritable> entry : min.entrySet()) {
                 dmeta.minDate.put(entry.getKey(), translator.toDate(entry.getValue()));
             }
-            for (Entry<String, String> entry : max.entrySet()) {
+            for (Entry<String, BytesWritable> entry : max.entrySet()) {
                 dmeta.maxDate.put(entry.getKey(), translator.toDate(entry.getValue()));
             }
         }
@@ -357,7 +355,7 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 		@Override
 		public void handle(Scanner scanner) {
 			for (Entry<Key, Value> entry : scanner) {
-				double x = translator.toRatio(entry.getKey().getColumnFamily().toString());
+				double x = translator.toRatio(entry.getKey().getColumnFamilyData());
 				final String cq = entry.getKey().getColumnQualifier().toString();
 				if (cq.contains("COUNT"))
 				{
@@ -607,7 +605,7 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 			bitLookupScanner.setRange(new Range(featureId));
 			for (Entry<Key, Value> entry : bitLookupScanner) {
 				Key k = entry.getKey();
-				Text bucketValue = k.getColumnFamily();
+				ByteSequence bucketValue = k.getColumnFamilyData();
 				String cq = k.getColumnQualifier().toString();
 				if (cq.contains("COUNT"))
 				{
@@ -615,7 +613,7 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 					String bucket = typeParts[0];
 
 					//These will be ordered
-					Double x = trans.toRatio(bucketValue.toString());
+					double x = trans.toRatio(bucketValue);
 					if (distros.containsKey(bucket))
 					{
 						distros.get(bucket).increment(x);
@@ -646,7 +644,7 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 
 			for (Entry<Key, Value> entry : bitLookupScanner) {
 				Key k = entry.getKey();
-				Text bucketValue = k.getColumnFamily();
+				ByteSequence bucketValue = k.getColumnFamilyData();
 				String cq = k.getColumnQualifier().toString();
 				if (cq.contains("COUNT"))
 				{
@@ -665,7 +663,7 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 					if (counter >= reach)
 					{
 						counters.put(bucket, 0l);
-						double x = trans.toRatio(bucketValue.toString());
+						double x = trans.toRatio(bucketValue);
 						distros.get(bucket).pins.add(x);
 					}
 					else

@@ -53,6 +53,17 @@
                 <scope>provided</scope>
             </dependency>
             <dependency>
+                <groupId>org.apache.accumulo</groupId>
+                <artifactId>accumulo-core</artifactId>
+                <version>1.6.0</version>
+                <exclusions>
+                    <exclusion>
+                        <artifactId>hadoop-client</artifactId>
+                        <groupId>hadoop-client</groupId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
                 <version>1.6.1</version>
@@ -128,21 +139,10 @@
 		<module>amino-impl</module>
 	</modules>
 
-	<repositories>
-		<repository>
-			<id>java.net</id>
-			<name>Java.net Maven Repository</name>
-			<url>http://download.java.net/maven/2</url>
-		</repository>
-		<repository>
-			<id>gov-ext-release</id>
-			<name>GovFoundry External Snapshots</name>
-			<url>http://maven.govfoundry.metagno.me:8081/artifactory/ext-release-local</url>
-		</repository>
-		<repository>
-			<id>gov-ext-snapshot</id>
-			<name>GovFoundry External Snapshots</name>
-			<url>http://maven.govfoundry.metagno.me:8081/artifactory/ext-snapshot-local</url>
-		</repository>
-	</repositories>
+        <repositories>
+          <repository>
+            <id>cloudera</id>
+            <url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
+          </repository>
+        </repositories>
 </project>

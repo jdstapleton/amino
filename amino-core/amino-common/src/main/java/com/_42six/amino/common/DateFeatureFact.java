@@ -3,6 +3,7 @@ package com._42six.amino.common;
 import java.io.DataInput;
 import java.io.IOException;
 
+import org.apache.accumulo.core.data.ByteSequence;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
@@ -19,7 +20,7 @@ public class DateFeatureFact extends IntervalFeatureFact
     /**
      * Default constructor
      */
-    protected DateFeatureFact() { }
+    protected DateFeatureFact() { super(new LongWritable(0)); }
 
     /**
      * Constructor for timestamps
@@ -37,23 +38,7 @@ public class DateFeatureFact extends IntervalFeatureFact
      * @param constraint        millisecond mask used to constraint the timestamp
      */
     protected DateFeatureFact(long timeInMillis, long constraint) {
-        super(new FeatureFactTranslatorImpl().fromDate(constrain(timeInMillis, constraint)));
-    }
-
-
-    /**
-     * Constructor to support instantiating from a text
-     *
-     * @param time      A pre-constrained, pre-translated timestamp
-     */
-    protected DateFeatureFact(Text time) {
-        super(time);
-    }
-
-    @Override
-    public Writable getFact()
-    {
-        return (Text)fact;
+        super(new LongWritable(constrain(timeInMillis, constraint)));
     }
 
     @Override
@@ -62,14 +47,10 @@ public class DateFeatureFact extends IntervalFeatureFact
         return FeatureFactType.DATE;
     }
 
-   @Override
-   public Text toText(FeatureFactTranslatorInt translator) {
-       return (Text)fact;
-   }
-
     @Override
     public int compareTo(FeatureFact ff)
     {
+
         return ((Text)this.fact).compareTo(((Text)ff.fact));
     }
 
@@ -93,4 +74,15 @@ public class DateFeatureFact extends IntervalFeatureFact
     {
         return timeInMillis - (timeInMillis % constraint);
     }
+
+    @Override
+    public ByteSequence toText(FeatureFactTranslatorInt translator) {
+        return translator.fromDate(((LongWritable)fact).get());
+    }
+
+    @Override
+    public void fromText(FeatureFactTranslatorInt translator, ByteSequence buffer) {
+        ((LongWritable)fact).set(translator.toDate(buffer));
+    }
+
 }

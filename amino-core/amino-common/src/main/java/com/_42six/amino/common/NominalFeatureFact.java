@@ -3,6 +3,8 @@ package com._42six.amino.common;
 import java.io.DataInput;
 import java.io.IOException;
 
+import com._42six.amino.common.translator.FeatureFactTranslatorInt;
+import org.apache.accumulo.core.data.ByteSequence;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 
@@ -19,7 +21,7 @@ public class NominalFeatureFact extends FeatureFact
 
 	}
 
-	@Override
+    @Override
 	public int compareTo(FeatureFact ff) 
 	{
 		return 1;
@@ -37,8 +39,19 @@ public class NominalFeatureFact extends FeatureFact
                 
 		return getFact();
 	}
-	
-	@Override
+
+
+    @Override
+    public void fromText(FeatureFactTranslatorInt translator, ByteSequence buffer) {
+        ((Text)fact).set(translator.toTextString(buffer));
+    }
+
+    @Override
+    public ByteSequence toText(FeatureFactTranslatorInt translator) {
+        return translator.fromText((Text)fact);
+    }
+
+    @Override
 	public String toString()
 	{
 		return getFact().toString();

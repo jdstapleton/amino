@@ -3,6 +3,8 @@ package com._42six.amino.common;
 import java.io.DataInput;
 import java.io.IOException;
 
+import com._42six.amino.common.translator.FeatureFactTranslatorInt;
+import org.apache.accumulo.core.data.ByteSequence;
 import org.apache.hadoop.io.Writable;
 import com._42six.amino.common.writable.CoordinateWritable;
 
@@ -12,8 +14,8 @@ public class PointFeatureFact extends FeatureFact
 	{
 		
 	}
-	
-	public PointFeatureFact(double longitudex, double latitudey)
+
+    public PointFeatureFact(double longitudex, double latitudey)
 	{
 		super(new CoordinateWritable(longitudex, latitudey));
 	}
@@ -56,5 +58,19 @@ public class PointFeatureFact extends FeatureFact
 	{
 		return Double.toString(((CoordinateWritable)this.fact).longitudex) + "," + Double.toString(((CoordinateWritable)this.fact).latitudey);
 	}
+
+    @Override
+    public ByteSequence toText(FeatureFactTranslatorInt translator) {
+        return translator.fromCoordinate((CoordinateWritable)fact);
+    }
+
+    @Override
+    public void fromText(FeatureFactTranslatorInt translator, ByteSequence buffer) {
+        CoordinateWritable buf = translator.toCoordinate(buffer);
+        CoordinateWritable thisCoordindate = (CoordinateWritable)fact;
+        thisCoordindate.longitudex = buf.longitudex;
+        thisCoordindate.latitudey = buf.latitudey;
+    }
+
 
 }

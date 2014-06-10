@@ -4,6 +4,8 @@ import java.io.DataInput;
 import java.io.IOException;
 import com._42six.amino.common.FeatureFact;
 
+import com._42six.amino.common.translator.FeatureFactTranslatorInt;
+import org.apache.accumulo.core.data.ByteSequence;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.Text;
@@ -26,8 +28,8 @@ public class OrdinalFeatureFact extends FeatureFact
 	{
 
 	}
-        
-	@Override
+
+    @Override
 	public int compareTo(FeatureFact ff)
 	{
 		//return ((EnumWritable<E>)this.fact).getValue().compareTo(((EnumWritable<E>)ff.fact).getValue());
@@ -53,7 +55,13 @@ public class OrdinalFeatureFact extends FeatureFact
                 
 		return getFact();
 	}
-	
+
+
+    @Override
+    public void fromText(FeatureFactTranslatorInt translator, ByteSequence buffer) {
+        // this is write over the stored fact
+        translator.toFeatureFact(buffer, this);
+    }
 
 	@Override
 	public String toString()

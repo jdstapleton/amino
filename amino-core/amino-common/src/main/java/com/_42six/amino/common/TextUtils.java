@@ -2,6 +2,8 @@ package com._42six.amino.common;
 
 import org.apache.hadoop.io.Text;
 
+import java.io.UnsupportedEncodingException;
+
 public class TextUtils {
 	public static byte [] getBytes(Text text) {
 		byte [] bytes = text.getBytes();
@@ -11,4 +13,16 @@ public class TextUtils {
 		}
 		return bytes;
 	}
+
+    public static byte [] getBytes(String text) {
+        return text.getBytes();
+    }
+
+    public static String asString(byte[] text) {
+        try {
+            return new String(text, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

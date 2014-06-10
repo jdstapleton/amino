@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import com._42six.amino.common.translator.FeatureFactTranslatorInt;
+import org.apache.accumulo.core.data.ByteSequence;
 import org.apache.hadoop.io.Writable;
 
 import com._42six.amino.common.writable.CoordinateWritable;
@@ -16,8 +18,8 @@ public class PolygonFeatureFact extends FeatureFact
 	{
 		
 	}
-	
-	public PolygonFeatureFact createInstance(List<PointFeatureFact> orderedPoints)
+
+    public PolygonFeatureFact createInstance(List<PointFeatureFact> orderedPoints)
 	{
 		ArrayList<CoordinateWritable> coords = new ArrayList<CoordinateWritable>();
 		for (PointFeatureFact pff : orderedPoints)
@@ -59,7 +61,19 @@ public class PolygonFeatureFact extends FeatureFact
 		return this.fact;
 	}
 
-	@Override
+
+    @Override
+    public void fromText(FeatureFactTranslatorInt translator, ByteSequence buffer) {
+        PolygonWritable myPoly = (PolygonWritable)this.fact;
+        myPoly.polygonCoordinates = translator.toPolygon(buffer);
+    }
+
+    @Override
+    public ByteSequence toText(FeatureFactTranslatorInt translator) {
+        return translator.fromPolygon(((PolygonWritable)this.fact).polygonCoordinates);
+    }
+
+    @Override
 	public int compareTo(FeatureFact ff) 
 	{
 		return ((PolygonWritable)this.fact).compareTo(((PolygonWritable)ff.fact));

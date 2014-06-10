@@ -1,5 +1,6 @@
 package com._42six.amino.query.services.accumulo;
 
+import com._42six.amino.common.TextUtils;
 import com.google.common.collect.Lists;
 import org.apache.accumulo.core.client.IteratorSetting;
 import org.apache.accumulo.core.data.Range;
@@ -36,13 +37,13 @@ public class AccumuloScanConfig {
 	public String columnQualifier;
 
     /** The first ColumnFamily value when searching over multiple ColumnFamilies*/
-	public String startColumnFamily;
+	public byte[] startColumnFamily;
 
     /** The first ColumnQualifier value when searching over multiple ColumnQualifiers*/
 	public String startColumnQualifier;
 
     /** The last ColumnFamily value when searching over multiple ColumnFamilies*/
-	public String endColumnFamily;
+	public byte[] endColumnFamily;
 
     /** The last ColumnQualifier value when searching over multiple ColumnQualifier*/
 	public String endColumnQualifier;
@@ -159,10 +160,19 @@ public class AccumuloScanConfig {
     }
 
     public String getStartColumnFamily() {
+        return TextUtils.asString(startColumnFamily);
+    }
+
+    public byte[] getStartColumnFamilyData() {
         return startColumnFamily;
     }
 
     public AccumuloScanConfig setStartColumnFamily(String startColumnFamily) {
+        this.startColumnFamily = TextUtils.getBytes(startColumnFamily);
+        return this;
+    }
+
+    public AccumuloScanConfig setStartColumnFamily(byte[] startColumnFamily) {
         this.startColumnFamily = startColumnFamily;
         return this;
     }
@@ -177,10 +187,19 @@ public class AccumuloScanConfig {
     }
 
     public String getEndColumnFamily() {
+        return TextUtils.asString(endColumnFamily);
+    }
+
+    public byte[] getEndColumnFamilyData() {
         return endColumnFamily;
     }
 
     public AccumuloScanConfig setEndColumnFamily(String endColumnFamily) {
+        this.endColumnFamily = TextUtils.getBytes(endColumnFamily);
+        return this;
+    }
+
+    public AccumuloScanConfig setEndColumnFamily(byte[] endColumnFamily) {
         this.endColumnFamily = endColumnFamily;
         return this;
     }

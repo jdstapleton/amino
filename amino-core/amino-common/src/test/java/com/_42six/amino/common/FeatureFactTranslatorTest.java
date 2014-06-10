@@ -2,13 +2,16 @@ package com._42six.amino.common;
 
 import com._42six.amino.common.translator.FeatureFactTranslatorImpl;
 import com._42six.amino.common.translator.FeatureFactTranslatorInt;
-import org.apache.hadoop.io.Text;
+import org.apache.accumulo.core.data.ByteSequence;
+import org.apache.hadoop.io.BytesWritable;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com._42six.amino.common.translator.FeatureFactTranslatorImpl.bytesSequenceToHexString;
 
 public class FeatureFactTranslatorTest {
 	
@@ -34,9 +37,10 @@ public class FeatureFactTranslatorTest {
 	
 	public void testRatio(double input) {
 		logger.info("inputRatio: \t" + input);
-		Text txtRatio = translator.fromRatio(input);
-		logger.info("converted: \t" + txtRatio);
-		double output = translator.toRatio(String.valueOf(txtRatio));
+		ByteSequence txtRatio = translator.fromRatio(input);
+        String strVersion = bytesSequenceToHexString(txtRatio);
+		logger.info("converted: \t" + strVersion);
+		double output = translator.toRatio(txtRatio);
 		logger.info("outputRatio: \t" + output);
 		Assert.assertEquals(input, output, 0.0000001);
 		//Assert.assertEquals(input, output, 0);
@@ -57,9 +61,10 @@ public class FeatureFactTranslatorTest {
 	
 	public void testInterval(double input) {
 		logger.info("inputIntv: \t" + input);
-		Text txtInterval = translator.fromInterval(input);
-		logger.info("converted: \t" + txtInterval);
-		double output = translator.toInterval(String.valueOf(txtInterval));
+		ByteSequence txtInterval = translator.fromInterval(input);
+        String strVersion = bytesSequenceToHexString(txtInterval);
+		logger.info("converted: \t" + strVersion);
+		double output = translator.toInterval(txtInterval);
 		logger.info("outputIntv: \t" + output);
 		Assert.assertEquals(input, output, 0.0000001);
 		//Assert.assertEquals(input, output, 0);

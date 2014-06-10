@@ -1,5 +1,6 @@
 package com._42six.amino.query.services.accumulo;
 
+import com._42six.amino.common.TextUtils;
 import com._42six.amino.common.entity.Hypothesis;
 import com._42six.amino.common.entity.HypothesisFeature;
 import org.apache.accumulo.core.client.*;
@@ -129,7 +130,7 @@ public abstract class AccumuloTest {
         final HypothesisFeature f = new HypothesisFeature();
         f.featureMetadataId = testRestrictionId;
         f.type = "RESTRICTION";
-        f.value = restrictions;
+        f.value = TextUtils.getBytes(restrictions);
         hypothesis.hypothesisFeatures.add(f);
         return hypothesis;
     }
@@ -138,7 +139,7 @@ public abstract class AccumuloTest {
         final HypothesisFeature f = new HypothesisFeature();
         f.featureMetadataId = testNominalId;
         f.type = "NOMINAL";
-        f.value = featureValue;
+        f.value = TextUtils.getBytes(featureValue);
         hypothesis.hypothesisFeatures.add(f);
         return hypothesis;
     }

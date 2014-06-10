@@ -1,6 +1,7 @@
 package com._42six.amino.common.accumulo;
 
 import com._42six.amino.common.FeatureFactType;
+import com._42six.amino.common.TextUtils;
 import org.apache.accumulo.core.client.*;
 import org.apache.accumulo.core.client.admin.TableOperations;
 import org.apache.accumulo.core.data.Key;
@@ -27,6 +28,11 @@ public class IteratorUtils {
 
     public static Range exactRow(String rowId, String cf, String cq){
         final Key key = new Key(rowId, cf, cq);
+        return new Range(key, key.followingKey(PartialKey.ROW_COLFAM_COLQUAL));
+    }
+
+    public static Range exactRow(String rowId, String cf, byte[] cq){
+        final Key key = new Key(new Text(rowId), new Text(cf), new Text(cq));
         return new Range(key, key.followingKey(PartialKey.ROW_COLFAM_COLQUAL));
     }
 

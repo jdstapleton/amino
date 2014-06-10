@@ -1,8 +1,12 @@
 package com._42six.amino.common.entity;
 
+import com._42six.amino.common.TextUtils;
 import com.google.gson.Gson;
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
+import org.apache.hadoop.io.Text;
+
+import java.nio.charset.CharacterCodingException;
 
 /**
  * A HypothesisFeature represents a configured version of a FeatureMetadata. The
@@ -42,7 +46,7 @@ public class HypothesisFeature {
 	public String toAuditString() {
 		String auditString;
 		if(type.compareTo("NOMINAL") == 0 || type.compareTo("RESTRICTION") == 0) {
-			auditString = this.value;
+			auditString = TextUtils.asString(this.value);
 		} else if(type.compareTo("RATIO") == 0 || type.compareTo("INTERVAL") == 0) { // inList
 			auditString = "min: " + min + "max: " + max;
 		} else if(type.compareTo("DATE") == 0 || type.compareTo("DATEHOUR") == 0) {
@@ -119,7 +123,7 @@ public class HypothesisFeature {
 	public String featureMetadataId;
 	public String type;
 	public String operator;
-	public String value;
+	public byte[] value;
 	public double min;
 	public double max;
 	public String dateTimeType;
@@ -147,4 +151,14 @@ public class HypothesisFeature {
 	 */
 	public double uniqueness;
 	public boolean include;
+
+    /**
+     * This method converts the data into a UTF-8 encoded string.  Use this method only if the value is actually a
+     * UTF-8 encoded string.
+     * @return the value as a String.
+     * @throws CharacterCodingException - if value is not a UTF-8 encoded string
+     */
+    public String valueAsString() throws CharacterCodingException {
+        return Text.decode(value);
+    }
 }

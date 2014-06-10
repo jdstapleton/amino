@@ -2,8 +2,9 @@ package com._42six.amino.common;
 
 import java.io.DataInput;
 import java.io.IOException;
+
+import org.apache.accumulo.core.data.ByteSequence;
 import org.apache.hadoop.io.DoubleWritable;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 
 import com._42six.amino.common.translator.FeatureFactTranslatorInt;
@@ -57,13 +58,13 @@ public class IntervalFeatureFact extends FeatureFact
 	}
 
 	@Override
-	public Text toText() {
-		return new Text(toString());
-	}
-
-	@Override
-	public Text toText(FeatureFactTranslatorInt translator) {	
+	public ByteSequence toText(FeatureFactTranslatorInt translator) {
 		return translator.fromInterval(((DoubleWritable)fact).get());
 	}
+
+    @Override
+    public void fromText(FeatureFactTranslatorInt translator, ByteSequence buffer) {
+        ((DoubleWritable)fact).set(translator.toInterval(buffer));
+    }
 
 }

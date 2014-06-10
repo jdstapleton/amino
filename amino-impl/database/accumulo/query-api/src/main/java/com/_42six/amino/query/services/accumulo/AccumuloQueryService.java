@@ -36,6 +36,7 @@ import org.apache.accumulo.core.client.Scanner;
 import org.apache.accumulo.core.data.*;
 import org.apache.accumulo.core.iterators.user.RegExFilter;
 import org.apache.accumulo.core.security.Authorizations;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.log4j.Logger;
 
@@ -745,7 +746,7 @@ public class AccumuloQueryService implements AminoQueryService {
                 featureStats.increment();
                 scanEntry.getKey().getColumnQualifier(featureIdText);
                 final String featureId = featureIdText.toString();
-                final String featureValue = scanEntry.getValue().toString();
+                final byte[] featureValue = scanEntry.getValue().get();
 
                 // Check to see if we are filtering featureIds or if we are accepting them all (null)
                 if(featureIds == null || (featureIds.contains(featureId))){
@@ -773,7 +774,7 @@ public class AccumuloQueryService implements AminoQueryService {
                     // Set the appropriate values
                     if(FeatureFactType.numericIntervalTypes.contains(hypoFeature.type)) {
                         log.debug("Config RATIO with value $featureValue");
-                        Double convertedVal = translator.toRatio(featureValue);
+                        double convertedVal = translator.toRatio(featureValue);
                         hypoFeature.min = convertedVal;
                         hypoFeature.max = convertedVal;
                     } else if(hypoFeature.type.compareTo("NOMINAL") == 0){
@@ -781,7 +782,7 @@ public class AccumuloQueryService implements AminoQueryService {
                         hypoFeature.value = featureValue;
                     } else if (FeatureFactType.dateIntervalTypes.contains(hypoFeature.type)) {
                         log.debug("Config DATE with $featureValue");
-                        Long convertedVal = translator.toDate(featureValue);
+                        long convertedVal = translator.toDate(featureValue);
                         hypoFeature.timestampFrom = convertedVal;
                         hypoFeature.timestampTo = convertedVal;
 
@@ -1255,7 +1256,7 @@ public class AccumuloQueryService implements AminoQueryService {
             final HashSet<String> restrictionValues = new HashSet<String>(restrictions.size());
             for(HypothesisFeature hf : restrictions){
                 // TODO - FIXME HACK AGGGHHH The GUI is sending the values in as ["a,b,c"] instead of ["a", "b", "c"]
-                String hackValue = hf.value;
+                String hackValue = Text.decode(hf.value);
                 hackValue = hackValue.replaceAll("\\[\"","");
                 hackValue = hackValue.replaceAll("\"]","");
                 for(String v : hackValue.split(",")){
@@ -1315,7 +1316,7 @@ public class AccumuloQueryService implements AminoQueryService {
 
         // We need to tell the iterator which features should be OR'd when looking up values (RATIOS, etc) and which
         // ones simply needed to be AND'd (pretty much everything else)
-        final Set<AbstractMap.SimpleImmutableEntry<String, String>> andIds = new HashSet<AbstractMap.SimpleImmutableEntry<String, String>>();
+        final Set<AbstractMap.SimpleImmutableEntry<String, byte[]>> andIds = new HashSet<AbstractMap.SimpleImmutableEntry<String, byte[]>>();
         final Set<String> orIds = new HashSet<String>();
 
         final BatchScanner revByBucketScanner = persistenceService.createBatchScanner(reverseByBucketTable, auths);
@@ -1340,7 +1341,8 @@ public class AccumuloQueryService implements AminoQueryService {
                                     new Key(rowid, DS_BN + feature.featureMetadataId, translator.fromRatio(feature.max).toString()).followingKey(PartialKey.ROW_COLFAM_COLQUAL)));
                         }
                     } else {
-                        andIds.add(new AbstractMap.SimpleImmutableEntry<String, String>(DS_BN + feature.featureMetadataId, feature.value));
+                        andIds.add(new AbstractMap.SimpleImmutableEntry<String, byte[]>(DS_BN + feature.featureMetadataId, feature.value));
+
                         ranges.add(IteratorUtils.exactRow(rowid, DS_BN + feature.featureMetadataId, feature.value));
                     }
                 }

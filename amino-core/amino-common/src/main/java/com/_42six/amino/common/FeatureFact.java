@@ -1,12 +1,13 @@
 package com._42six.amino.common;
 
+import com._42six.amino.common.translator.FeatureFactTranslatorInt;
+import org.apache.accumulo.core.data.ByteSequence;
+import org.apache.hadoop.io.Writable;
+
 import java.io.DataInput;
 import java.io.IOException;
 
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.Writable;
-
-import com._42six.amino.common.translator.FeatureFactTranslatorInt;
+import static com._42six.amino.common.util.ByteArrayOutputStreamToBytesWritable.toByteSequence;
 
 public abstract class FeatureFact implements Comparable<FeatureFact>
 {
@@ -15,20 +16,21 @@ public abstract class FeatureFact implements Comparable<FeatureFact>
 	public FeatureFact(Writable fact)
 	{
 		this.fact = fact;
-	}
+        }
 
 	public FeatureFact()
 	{
 
 	}
+	public ByteSequence toText(){
+        return toByteSequence(fact);
+    }
 
-	public Text toText(){
-		return new Text(this.fact.toString());
+	public ByteSequence toText(FeatureFactTranslatorInt translator) {
+        return translator.fromFeatureFact(this);
 	}
 
-	public Text toText(FeatureFactTranslatorInt translator) {
-		return translator.fromFeatureFact(this);
-	}
+    public abstract void fromText(FeatureFactTranslatorInt translator, ByteSequence buffer);
 
 	public Writable getFact() {
 		return fact;

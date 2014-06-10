@@ -1,5 +1,6 @@
 package com._42six.amino.query.services.accumulo;
 
+import com._42six.amino.common.TextUtils;
 import com._42six.amino.common.entity.Hypothesis;
 import com._42six.amino.common.entity.HypothesisFeature;
 import org.junit.Before;
@@ -43,7 +44,7 @@ public abstract class QueryApiIntegrationTests {
         HypothesisFeature f = new HypothesisFeature();
         f.featureMetadataId = featureId;
         f.type = "NOMINAL";
-        f.value = featureValue;
+        f.value = TextUtils.getBytes(featureValue);
         hypothesis.hypothesisFeatures.add(f);
     }
 

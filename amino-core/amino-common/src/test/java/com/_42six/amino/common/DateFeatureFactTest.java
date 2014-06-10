@@ -1,5 +1,6 @@
 package com._42six.amino.common;
 
+import static com._42six.amino.common.translator.FeatureFactTranslatorImpl.bytesSequenceToHexString;
 import static org.junit.Assert.*;
 
 import java.io.ByteArrayInputStream;
@@ -8,9 +9,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-import org.apache.hadoop.io.DoubleWritable;
-import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.Text;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.Ignore;
@@ -30,13 +28,13 @@ public class DateFeatureFactTest {
         @Test
         public void testWritable() {
             FeatureFactTranslatorInt translator = new FeatureFactTranslatorImpl();
-            assertEquals(1056153600000L, translator.toDate(fact.toText().toString()));
+            assertEquals(1056153600000L, translator.toDate(fact.toText()));
         }
 	
 	@Ignore @Test
 	public void testToTextFeatureFactTranslatorInt() {
 		FeatureFactTranslatorInt translator = new FeatureFactTranslatorImpl();
-		assertEquals(new Text("000000004D3F6400"), fact.toText(translator));
+		assertEquals("000000004D3F6400", bytesSequenceToHexString(fact.toText(translator)));
 	}
 
 	@Test
@@ -46,8 +44,7 @@ public class DateFeatureFactTest {
 
 	@Ignore @Test
 	public void testToText() {
-		Text expected = new Text(Double.toString(4.26));
-		assertEquals(expected, fact.toText());
+		assertEquals("000000004D3F6400", bytesSequenceToHexString(fact.toText()));
 	}
 
 	@Ignore @Test

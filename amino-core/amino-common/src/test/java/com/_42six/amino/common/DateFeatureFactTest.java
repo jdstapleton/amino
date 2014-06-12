@@ -1,6 +1,6 @@
 package com._42six.amino.common;
 
-import static com._42six.amino.common.translator.FeatureFactTranslatorImpl.bytesSequenceToHexString;
+import static com._42six.amino.common.util.ByteSequenceUtils.bytesSequenceToHexString;
 import static org.junit.Assert.*;
 
 import java.io.ByteArrayInputStream;

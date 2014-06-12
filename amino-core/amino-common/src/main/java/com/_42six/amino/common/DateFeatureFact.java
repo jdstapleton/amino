@@ -1,15 +1,13 @@
 package com._42six.amino.common;
 
-import java.io.DataInput;
-import java.io.IOException;
-
+import com._42six.amino.common.translator.FeatureFactTranslatorInt;
 import org.apache.accumulo.core.data.ByteSequence;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 
-import com._42six.amino.common.translator.FeatureFactTranslatorImpl;
-import com._42six.amino.common.translator.FeatureFactTranslatorInt;
+import java.io.DataInput;
+import java.io.IOException;
 
 public class DateFeatureFact extends IntervalFeatureFact
 {
@@ -47,16 +45,20 @@ public class DateFeatureFact extends IntervalFeatureFact
         return FeatureFactType.DATE;
     }
 
+    public long asTimeStamp() {
+        return ((LongWritable)this.fact).get();
+    }
+
     @Override
     public int compareTo(FeatureFact ff)
     {
 
-        return ((Text)this.fact).compareTo(((Text)ff.fact));
+        return ((LongWritable)this.fact).compareTo(((LongWritable)ff.fact));
     }
 
     @Override
     public Writable setWritable(DataInput in) throws IOException {
-        setFact(new Text(Text.readString(in)));
+        setFact(new LongWritable(in.readLong()));
         return getFact();
     }
 
@@ -73,6 +75,10 @@ public class DateFeatureFact extends IntervalFeatureFact
     protected static long constrain(long timeInMillis, long constraint)
     {
         return timeInMillis - (timeInMillis % constraint);
+    }
+
+    public Text asText() {
+        return new Text(fact.toString());
     }
 
     @Override

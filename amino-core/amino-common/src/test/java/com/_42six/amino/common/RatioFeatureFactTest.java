@@ -9,7 +9,7 @@ import org.junit.Test;
 
 import java.io.*;
 
-import static com._42six.amino.common.translator.FeatureFactTranslatorImpl.bytesSequenceToHexStringWithSpaces;
+import static com._42six.amino.common.util.ByteSequenceUtils.bytesSequenceToHexStringWithSpaces;
 import static org.junit.Assert.*;
 
 public class RatioFeatureFactTest {

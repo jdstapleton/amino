@@ -223,11 +223,4 @@ public class FeatureFactTranslatorImpl implements FeatureFactTranslatorInt {
         return new ArrayByteSequence(ULONG_LEXICODER.encode(fact));
     }
 
-    public static String bytesSequenceToHexString(ByteSequence writable) {
-        return BaseEncoding.base16().encode(writable.getBackingArray(), 0, writable.length());
-    }
-
-    public static String bytesSequenceToHexStringWithSpaces(ByteSequence writable) {
-        return BaseEncoding.base16().encode(writable.getBackingArray(), 0, writable.length()).replaceAll(".{2}", "$0 ").trim();
-    }
 }

@@ -3,7 +3,6 @@ package com._42six.amino.common;
 import com._42six.amino.common.translator.FeatureFactTranslatorImpl;
 import com._42six.amino.common.translator.FeatureFactTranslatorInt;
 import org.apache.accumulo.core.data.ByteSequence;
-import org.apache.hadoop.io.BytesWritable;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -11,7 +10,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com._42six.amino.common.translator.FeatureFactTranslatorImpl.bytesSequenceToHexString;
+import static com._42six.amino.common.util.ByteSequenceUtils.bytesSequenceToHexString;
 
 public class FeatureFactTranslatorTest {
 	

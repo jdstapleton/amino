@@ -1,112 +1,59 @@
 package com._42six.amino.bitmap;
 
 import com._42six.amino.common.AminoConfiguration;
-import com._42six.amino.common.bigtable.TableConstants;
-import com._42six.amino.common.util.PathUtils;
+import com.google.common.base.Optional;
+import com.google.common.collect.Sets;
 import org.apache.accumulo.core.client.ClientConfiguration;
 import org.apache.accumulo.core.client.mapreduce.AccumuloOutputFormat;
 import org.apache.accumulo.core.client.security.tokens.PasswordToken;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.cli.Option;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
-import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-public class StatsJob extends Configured implements Tool {
-
-    private static final String AMINO_NUM_REDUCERS = "amino.num.reducers";
-    private static final String AMINO_NUM_REDUCERS_STATS = "amino.num.reducers.job.stats";
-    
-	private static final int DEFAULT_NUM_REDUCERS = 14;
-	
-//	private static void recreateLookupTable(Configuration conf) throws IOException {
-//        AminoConfiguration.loadDefault(conf, "AminoDefaults");
-//        String instanceName = conf.get(ACCUMULO_INSTANCE);
-//        String zooKeepers = conf.get(ACCUMULO_ZOOKEEPERS);
-//        String user = conf.get(ACCUMULO_USERNAME);
-//        String password = conf.get(ACCUMULO_PASSWORD);
-//        String lookupTable = conf.get("amino.bitmap.featureLookupTable");
-//
-//        Instance inst = new ZooKeeperInstance(instanceName, zooKeepers);
-//        TableOperations tableOps;
-//        try {
-//            tableOps = inst.getConnector(user, password).tableOperations();
-//        } catch (BTException ex) {
-//            throw new IOException(ex);
-//        } catch (BTSecurityException ex) {
-//            throw new IOException(ex);
-//        }
-//
-//        IteratorUtils.createTable(tableOps, lookupTable, true, true);
-//    }
+public class StatsJob extends BitmapJob {
 
 	@Override
 	public int run(String[] args) throws Exception {
         System.out.println("\n================================ Stats Job ================================\n");
-		Configuration conf = getConf();
-        String instanceName = conf.get(TableConstants.CFG_INSTANCE);
-        String zooKeepers = conf.get(TableConstants.CFG_ZOOKEEPERS);
-        String user = conf.get(TableConstants.CFG_USER);
-        String password = conf.get(TableConstants.CFG_PASSWORD);
-        
-        //recreateLookupTable(conf);
+
+        // Create the command line options to be parsed
+        final Option o1 = new Option("o", "outputDir", true, "The output directory");
+        initializeConfigAndOptions(args, Optional.of(Sets.newHashSet(o1)));
+        final Configuration conf = getConf();
+        loadConfigValues(conf);
 
         Job job = new Job(conf, "Amino stats job");
         job.setJarByClass(StatsJob.class);
-        
-        job.setInputFormatClass(SequenceFileInputFormat.class);
-        
-        
-        String inputPaths = StringUtils.join(PathUtils.getJobDataPaths(conf, args[0]), ',');
-        System.out.println("Input paths: [" + inputPaths + "].");
-        
-        String cachePaths = StringUtils.join(PathUtils.getJobCachePaths(conf, args[0]), ',');
-        System.out.println("Cache paths: [" + cachePaths + "].");
-        
-        PathUtils.setCachePath(job.getConfiguration(), cachePaths);
-        SequenceFileInputFormat.setInputPaths(job, inputPaths); // TODO: use configuration instead of positional argument
+        initializeJob(job);
         
         job.setMapperClass(StatsMapper.class);
         job.setMapOutputKeyClass(StatsKey.class);
         job.setMapOutputValueClass(Text.class);
         job.setReducerClass(StatsReducer.class);
         
-        //set number of reducers
-        int statsNumReducers = conf.getInt(AMINO_NUM_REDUCERS_STATS, 0);
+        // Set number of reducers
+        int statsNumReducers = conf.getInt(AminoConfiguration.NUM_REDUCERS_STATS, 0);
         if (statsNumReducers > 0) {
         	job.setNumReduceTasks(statsNumReducers);
         }
         else {
-        	job.setNumReduceTasks(conf.getInt(AMINO_NUM_REDUCERS, DEFAULT_NUM_REDUCERS));
+        	job.setNumReduceTasks(conf.getInt(AminoConfiguration.NUM_REDUCERS, AminoConfiguration.DEFAULT_NUM_REDUCERS));
         }
-        
-        job.setOutputFormatClass(AccumuloOutputFormat.class);
 
+
+        job.setOutputFormatClass(AccumuloOutputFormat.class);
         AccumuloOutputFormat.setZooKeeperInstance(job, new ClientConfiguration().withInstance(instanceName).withZkHosts(zooKeepers));
         AccumuloOutputFormat.setConnectorInfo(job, user, new PasswordToken(password.getBytes("UTF-8")));
         AccumuloOutputFormat.setCreateTables(job, true);
 
         boolean complete = job.waitForCompletion(true);
-        if (!complete)
-		{
-			return 1;
-		}
-		else
-		{
-			return 0;
-		}
+        return complete ? 0 : 1;
 	}
 	
 	public static void main(String[] args) throws Exception {
-        Configuration conf = new Configuration();
-        conf.set(AminoConfiguration.DEFAULT_CONFIGURATION_PATH_KEY, args[1]); // TODO: use flag instead of positional
-        AminoConfiguration.loadDefault(conf, "AminoDefaults", true);
-        
-        int res = ToolRunner.run(conf, new StatsJob(), args);
-        System.exit(res);
+        System.exit(ToolRunner.run(new StatsJob(), args));
     }
 
 }

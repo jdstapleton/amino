@@ -8,6 +8,7 @@ import com._42six.amino.common.accumulo.IteratorUtils;
 import com._42six.amino.common.bigtable.TableConstants;
 import com._42six.amino.common.translator.FeatureFactTranslatorImpl;
 import com._42six.amino.common.translator.FeatureFactTranslatorInt;
+import com.google.common.base.Optional;
 import com.google.gson.Gson;
 import org.apache.accumulo.core.client.*;
 import org.apache.accumulo.core.client.Scanner;
@@ -19,23 +20,22 @@ import org.apache.accumulo.core.data.*;
 import org.apache.accumulo.core.security.Authorizations;
 import org.apache.accumulo.core.security.ColumnVisibility;
 import org.apache.accumulo.core.util.Pair;
-import org.apache.commons.cli.*;
+import org.apache.commons.cli.Option;
 import org.apache.commons.math3.stat.descriptive.moment.Mean;
 import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 import java.io.IOException;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
 
-public final class FeatureMetadataJob extends Configured implements Tool {
+public final class FeatureMetadataJob extends BitmapJob {
 
 	private static final String MAX_NUMBER_OF_NOMINALS = "amino.num.nominals.max";
 	private static final int MAX_NUMBER_OF_NOMINALS_DEFAULT = 250;
@@ -256,10 +256,8 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 
 		private class FeatureFactCount implements Comparable<FeatureFactCount>
 		{
-
 			public String fact;
 			public long count;
-
 
 			public FeatureFactCount(String fact, long count)
 			{
@@ -277,7 +275,6 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 			{
 				return fact + ":" + count;
 			}
-
 
 			@Override
 			public int hashCode() {
@@ -553,7 +550,7 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 		protected void map(Key key, Value value, Context context) throws IOException, InterruptedException {
 
 			final Configuration conf = context.getConfiguration();
-			final boolean blastIndex = conf.getBoolean("amino.bitmap.first.run", true);
+			final boolean blastIndex = conf.getBoolean(AminoConfiguration.FIRST_RUN, true);
 			final int maxNominals = conf.getInt(MAX_NUMBER_OF_NOMINALS, MAX_NUMBER_OF_NOMINALS_DEFAULT);
 			final int maxTopNominals = conf.getInt(MAX_NUMBER_OF_TOP_NOMINALS, MAX_NUMBER_OF_TOP_NOMINALS_DEFAULT);
 			final FeatureMetadata metadata = FeatureMetadata.fromJson(value.toString());
@@ -585,7 +582,7 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 
 				if (blastIndex)
 				{
-					context.write(new Text(conf.get("amino.metadataTable") + IteratorUtils.TEMP_SUFFIX), mutation);
+					context.write(new Text(conf.get("amino.metadataTable") + AminoConfiguration.TEMP_SUFFIX), mutation);
 				}
 				else
 				{
@@ -681,15 +678,14 @@ public final class FeatureMetadataJob extends Configured implements Tool {
             String zooKeepers = conf.get(TableConstants.CFG_ZOOKEEPERS);
             String user = conf.get(TableConstants.CFG_USER);
             String password = conf.get(TableConstants.CFG_PASSWORD);
-			final String indexTable = conf.get("amino.bitmap.indexTable");
-			final boolean blastIndex = conf.getBoolean("amino.bitmap.first.run", true);
+			final String indexTable = conf.get(AminoConfiguration.TABLE_INDEX);
+			final boolean blastIndex = conf.getBoolean(AminoConfiguration.FIRST_RUN, true);
 
 			Instance inst = new ZooKeeperInstance(instanceName, zooKeepers);
 			Connector conn;
 			Authorizations auths;
 			try {
-//				conn = inst.getConnector(user, new PasswordToken(password));
-                conn = inst.getConnector(user, password);
+				conn = inst.getConnector(user, new PasswordToken(password));
 				auths = conn.securityOperations().getUserAuthorizations(user);
 			} catch (AccumuloException ex) {
 				throw new IOException(ex);
@@ -701,7 +697,7 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 			try {
 				if (blastIndex)
 				{
-					scanner = conn.createScanner(indexTable + IteratorUtils.TEMP_SUFFIX, auths);
+					scanner = conn.createScanner(indexTable + AminoConfiguration.TEMP_SUFFIX, auths);
 				}
 				else
 				{
@@ -742,10 +738,10 @@ public final class FeatureMetadataJob extends Configured implements Tool {
         String zooKeepers = conf.get(TableConstants.CFG_ZOOKEEPERS);
         String user = conf.get(TableConstants.CFG_USER);
         String password = conf.get(TableConstants.CFG_PASSWORD);
-		final String metadataTable = conf.get("amino.metadataTable");
-		final long maxMemory = conf.getLong("bigtable.maxMemory", 1000000L);
-		final long maxLatency = conf.getLong("bigtable.maxLatency", 1000L);
-		final int maxWriteThreads = conf.getInt("bigtable.maxWriteThreads", 10);
+		final String metadataTable = conf.get(AminoConfiguration.TABLE_METADATA);
+		final long maxMemory = conf.getLong(AminoConfiguration.MAX_MEMORY, 1000000L);
+		final long maxLatency = conf.getLong(AminoConfiguration.MAX_LATENCY, 1000L);
+		final int maxWriteThreads = conf.getInt(AminoConfiguration.MAX_WRITE_THREADS, 10);
 //		final String aminoVis = conf.get("amino.visibility");
 		// final ColumnVisibility cv = new ColumnVisibility(aminoVis.getBytes());
         final ColumnVisibility cv = new ColumnVisibility();
@@ -753,7 +749,7 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 		final Instance btInstance = new ZooKeeperInstance(instanceName, zooKeepers);
 		Connector connector;
 		try {
-			connector = btInstance.getConnector(user, password);
+			connector = btInstance.getConnector(user, new PasswordToken(password));
 		} catch (AccumuloException ex) {
 			throw new IOException(ex);
 		} catch (AccumuloSecurityException ex) {
@@ -762,22 +758,20 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 
 		BatchWriter writer = null;
 		try {
-//            final BatchWriterConfig config = new BatchWriterConfig();
-//            config.setMaxLatency(maxLatency, TimeUnit.MILLISECONDS);
-//            config.setMaxMemory(maxMemory);
-//            config.setMaxWriteThreads(maxWriteThreads);
+            final BatchWriterConfig config = new BatchWriterConfig();
+            config.setMaxLatency(maxLatency, TimeUnit.MILLISECONDS);
+            config.setMaxMemory(maxMemory);
+            config.setMaxWriteThreads(maxWriteThreads);
 			if (blastIndex)
 			{
-//                writer = connector.createBatchWriter(metadataTable + IteratorUtils.TEMP_SUFFIX, config);
-				writer = connector.createBatchWriter(metadataTable + IteratorUtils.TEMP_SUFFIX, maxMemory, maxLatency, maxWriteThreads);
+                writer = connector.createBatchWriter(metadataTable + AminoConfiguration.TEMP_SUFFIX, config);
 			}
 			else
 			{
-//                writer = connector.createBatchWriter(metadataTable,config);
-				writer = connector.createBatchWriter(metadataTable, maxMemory, maxLatency, maxWriteThreads);
+                writer = connector.createBatchWriter(metadataTable,config);
 			}
-			final int numberOfShards = conf.getInt(BitmapConfigHelper.BITMAP_CONFIG_NUM_SHARDS, 10);
-			final int numberOfHashes = conf.getInt("amino.bitmap.num-hashes", 1);
+			final int numberOfShards = conf.getInt(AminoConfiguration.NUM_SHARDS, 10);
+			final int numberOfHashes = conf.getInt(AminoConfiguration.NUM_HASHES, 1);
 
 			final Mutation hashCountMutation = new Mutation("hashcount");
 			hashCountMutation.put("", "", cv, Integer.toString(numberOfHashes));
@@ -806,12 +800,12 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 	//This is just some clean up if it is an update and we aren't blasting the entire index
 	private void cleanupFromUpdate(Configuration conf, Instance inst, String user, byte[] password) throws IOException
 	{
-		String metadataTable = conf.get("amino.metadataTable");
+		String metadataTable = conf.get(AminoConfiguration.TABLE_METADATA);
 		TableOperations tableOps;
 		try
 		{
-			tableOps = inst.getConnector(user, password).tableOperations();
-			deleteTables(tableOps, true, metadataTable + IteratorUtils.TEMP_SUFFIX);
+			tableOps = inst.getConnector(user, new PasswordToken(password)).tableOperations();
+			deleteTables(tableOps, true, metadataTable + AminoConfiguration.TEMP_SUFFIX);
 			IteratorUtils.compactTable(tableOps, metadataTable, true);
 
 		} catch (Exception e) {
@@ -821,66 +815,66 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 
 	private void swapTables(Configuration conf, Instance inst, String user, byte[] password) throws IOException
 	{
-		String metadataTable = conf.get("amino.metadataTable");
-		String lookupTable = conf.get("amino.bitmap.featureLookupTable");
-		String bucketTable = conf.get("amino.bitmap.bucketTable");
-		String indexTable = conf.get("amino.bitmap.indexTable");
+		String metadataTable = conf.get(AminoConfiguration.TABLE_METADATA);
+		String lookupTable = conf.get(AminoConfiguration.TABLE_FEATURE_LOOKUP);
+		String bucketTable = conf.get(AminoConfiguration.TABLE_BUCKET);
+		String indexTable = conf.get(AminoConfiguration.TABLE_INDEX);
 		String reverseBucket = bucketTable.replace("amino_", "amino_reverse_");
 		String reverseLookup = lookupTable.replace("amino_", "amino_reverse_");
 
-                // Add all tables to a list for iterating over table operations
-                List<String> tableNames = new ArrayList<String>();
-                tableNames.add(metadataTable);
-                tableNames.add(lookupTable);
-                tableNames.add(bucketTable);
-                tableNames.add(indexTable);
-                tableNames.add(reverseBucket);
-                tableNames.add(reverseLookup);
+        // Add all tables to a list for iterating over table operations
+        List<String> tableNames = new ArrayList<String>();
+        tableNames.add(metadataTable);
+        tableNames.add(lookupTable);
+        tableNames.add(bucketTable);
+        tableNames.add(indexTable);
+        tableNames.add(reverseBucket);
+        tableNames.add(reverseLookup);
 
 		TableOperations tableOps;
 		try {
-			tableOps = inst.getConnector(user, password).tableOperations();
+			tableOps = inst.getConnector(user, new PasswordToken(password)).tableOperations();
 
-			String metadataTableOld = metadataTable + IteratorUtils.OLD_SUFFIX;
-			String lookupTableOld = lookupTable + IteratorUtils.OLD_SUFFIX;
-			String bucketTableOld = bucketTable + IteratorUtils.OLD_SUFFIX;
-			String indexTableOld = indexTable + IteratorUtils.OLD_SUFFIX;
-			String reverseLookupTableOld = reverseLookup + IteratorUtils.OLD_SUFFIX;
-			String reverseBucketTableOld = reverseBucket + IteratorUtils.OLD_SUFFIX;
+			String metadataTableOld = metadataTable + AminoConfiguration.OLD_SUFFIX;
+			String lookupTableOld = lookupTable + AminoConfiguration.OLD_SUFFIX;
+			String bucketTableOld = bucketTable + AminoConfiguration.OLD_SUFFIX;
+			String indexTableOld = indexTable + AminoConfiguration.OLD_SUFFIX;
+			String reverseLookupTableOld = reverseLookup + AminoConfiguration.OLD_SUFFIX;
+			String reverseBucketTableOld = reverseBucket + AminoConfiguration.OLD_SUFFIX;
 
 			/* delete old tables if there are any */
 			deleteTables(tableOps, false, metadataTableOld, lookupTableOld, bucketTableOld, indexTableOld, reverseLookupTableOld, reverseBucketTableOld);
 
 			/* rename all tables */
-                        Iterator<String> tblItr = tableNames.iterator();
-                        while (tblItr.hasNext()) {
-                            String table = tblItr.next();
+            Iterator<String> tblItr = tableNames.iterator();
+            while (tblItr.hasNext()) {
+                String table = tblItr.next();
 
-                            // Backup existing table (if any)
-                            if (tableOps.exists(table)) {
-                                tableOps.rename(table, table+IteratorUtils.OLD_SUFFIX);
-                            }
+                // Backup existing table (if any)
+                if (tableOps.exists(table)) {
+                    tableOps.rename(table, table+AminoConfiguration.OLD_SUFFIX);
+                }
 
-                            // Move temp table into place
-                            try {
-                                tableOps.rename(table+IteratorUtils.TEMP_SUFFIX, table);
-                            } catch (Exception tex) {
-                                // Table operations exception. Restore old table
-                                if (tableOps.exists(table+IteratorUtils.OLD_SUFFIX)) {
-                                    tableOps.rename(table+IteratorUtils.OLD_SUFFIX, table);
-                                }
-                                // Remove this table from the iterator
-                                tblItr.remove();
-                            }
-                        }
+                // Move temp table into place
+                try {
+                    tableOps.rename(table+AminoConfiguration.TEMP_SUFFIX, table);
+                } catch (Exception tex) {
+                    // Table operations exception. Restore old table
+                    if (tableOps.exists(table+AminoConfiguration.OLD_SUFFIX)) {
+                        tableOps.rename(table+AminoConfiguration.OLD_SUFFIX, table);
+                    }
+                    // Remove this table from the iterator
+                    tblItr.remove();
+                }
+            }
 
 			/* delete old tables */
 			deleteTables(tableOps, true, metadataTableOld, lookupTableOld, bucketTableOld, indexTableOld, reverseLookupTableOld, reverseBucketTableOld);
 
 			/* compact tables */
-                        for (String table: tableNames) {
-                            IteratorUtils.compactTable(tableOps, table, true);
-                        }
+            for (String table: tableNames) {
+                IteratorUtils.compactTable(tableOps, table, true);
+            }
 
 		} catch (Exception e) {
 			throw new IOException(e);
@@ -914,18 +908,14 @@ public final class FeatureMetadataJob extends Configured implements Tool {
     public int run(String[] args) throws Exception {
         System.out.println("\n================================ FeatureMetadata Job ================================\n");
 
+        initializeConfigAndOptions(args, Optional.<HashSet<Option>>absent());
         final Configuration conf = getConf();
-        //AminoConfiguration.loadDefault(conf, "AminoDefaults", true);
-        String instanceName = conf.get(TableConstants.CFG_INSTANCE);
-        String zooKeepers = conf.get(TableConstants.CFG_ZOOKEEPERS);
-        String user = conf.get(TableConstants.CFG_USER);
-        final byte[] password = conf.get(TableConstants.CFG_PASSWORD).getBytes();
-        final String metadataTable = conf.get("amino.metadataTable") + IteratorUtils.TEMP_SUFFIX; // You want to make sure you use the temp here even if blastIndex is false
-        final boolean blastIndex = conf.getBoolean("amino.bitmap.first.run", true); // See above, you always want to use temp for this input even if false
+        loadConfigValues(conf);
 
+        final String metadataTable = conf.get(AminoConfiguration.TABLE_METADATA) + AminoConfiguration.TEMP_SUFFIX; // You want to make sure you use the temp here even if blastIndex is false
 
         final Instance inst = new ZooKeeperInstance(instanceName, zooKeepers);
-        final Connector conn = inst.getConnector(user, password);
+        final Connector conn = inst.getConnector(user, new PasswordToken(password));
         final Authorizations auths = conn.securityOperations().getUserAuthorizations(user);
 
         final Job job = new Job(conf, "Amino feature metadata job");
@@ -965,11 +955,11 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 
         if (blastIndex)
         {
-            swapTables(conf, inst, user, password);
+            swapTables(conf, inst, user, password.getBytes());
         }
         else
         {
-            cleanupFromUpdate(conf, inst, user, password);
+            cleanupFromUpdate(conf, inst, user, password.getBytes());
         }
 
         return complete ? 0 : 1;
@@ -977,20 +967,6 @@ public final class FeatureMetadataJob extends Configured implements Tool {
 
 
 	public static void main(String[] args) throws Exception {
-        final Options gnuOptions = new Options();
-        final Option aminoDefaultConfigurationOption =
-                new Option("d", "amino_default_config_path", true, "The path where the amino default file lives.");
-        // aminoDefaultConfigurationOption.setRequired(true); // Not required if we are doing the args[0] thing
-        gnuOptions.addOption(aminoDefaultConfigurationOption);
-        final CommandLineParser cmdLineGnuParser = new GnuParser();
-        final CommandLine commandLine = cmdLineGnuParser.parse(gnuOptions, args);
-        final String aminoDefaultConfigPath = commandLine.getOptionValue("amino_default_config_path", args[0]);
-
-		final Configuration conf = new Configuration();
-		conf.set(AminoConfiguration.DEFAULT_CONFIGURATION_PATH_KEY, aminoDefaultConfigPath);
-		AminoConfiguration.loadDefault(conf, "AminoDefaults", true);
-		
-		int res = ToolRunner.run(conf, new FeatureMetadataJob(), args);
-		System.exit(res);
+        System.exit(ToolRunner.run(new FeatureMetadataJob(), args));
 	}
 }

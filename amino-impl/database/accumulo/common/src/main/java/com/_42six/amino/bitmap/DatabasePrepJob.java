@@ -5,45 +5,45 @@ import com._42six.amino.common.Metadata;
 import com._42six.amino.common.accumulo.*;
 import com._42six.amino.common.bigtable.TableConstants;
 import com._42six.amino.common.util.PathUtils;
+import com.google.common.base.Optional;
+import com.google.common.collect.Sets;
 import com.google.gson.Gson;
 import org.apache.accumulo.core.client.ClientConfiguration;
 import org.apache.accumulo.core.client.admin.TableOperations;
 import org.apache.accumulo.core.client.mapreduce.AccumuloOutputFormat;
 import org.apache.accumulo.core.client.security.tokens.PasswordToken;
 import org.apache.accumulo.core.data.Mutation;
+import org.apache.commons.cli.Option;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
-import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 import java.io.IOException;
 
 /**
  * Job for importing the metadata information from the framework driver into the Accumulo metadata table. Also creates
- * any tables that might be missing
+ * any tables that might be missing.  This is the first job run.
  */
-public class DatabasePrepJob extends Configured implements Tool {
+public class DatabasePrepJob extends BitmapJob {
 
     private static boolean createTables(Configuration conf) throws IOException
     {
-        // AminoConfiguration.loadDefault(conf, "AminoDefaults", true);
         final String instanceName = conf.get("bigtable.instance");
         final String zooKeepers = conf.get("bigtable.zookeepers");
         final String user = conf.get("bigtable.username");
         final String password = conf.get("bigtable.password");
-        final String metaTable = conf.get("amino.metadataTable");
-        final String hypoTable = conf.get("amino.hypothesisTable");
-        final String resultTable = conf.get("amino.queryResultTable");
-        final String membershipTable = conf.get("amino.groupMembershipTable");
-        final String groupHypothesisLUTable = conf.get("amino.groupHypothesisLUT");
-        final String groupMetadataTable = conf.get("amino.groupMetadataTable");
-        final String tableContext = conf.get("amino.tableContext", "amino");
-        final boolean blastMeta = conf.getBoolean("amino.first.run", false);
+        final String metaTable = conf.get(AminoConfiguration.TABLE_METADATA);
+        final String hypoTable = conf.get(AminoConfiguration.TABLE_HYPOTHESIS);
+        final String resultTable = conf.get(AminoConfiguration.TABLE_RESULT);
+        final String membershipTable = conf.get(AminoConfiguration.TABLE_GROUP_MEMBERSHIP);
+        final String groupHypothesisLUTable = conf.get(AminoConfiguration.TABLE_GROUP_HYPOTHESIS_LOOKUP);
+        final String groupMetadataTable = conf.get(AminoConfiguration.TABLE_GROUP_METADATA);
+        final String tableContext = conf.get(AminoConfiguration.TABLE_CONTEXT, "amino");
+        final boolean blastMeta = conf.getBoolean(AminoConfiguration.FIRST_RUN, false);
 
         final TableOperations tableOps = IteratorUtils.connect(instanceName, zooKeepers, user, password).tableOperations();
 
@@ -57,8 +57,6 @@ public class DatabasePrepJob extends Configured implements Tool {
         return success;
     }
 
-
-
     public static class MetadataConsolidatorReducer
             extends Reducer<Text, Text, Text, Mutation> {
 
@@ -67,7 +65,7 @@ public class DatabasePrepJob extends Configured implements Tool {
 
         @Override
         protected void setup(Context context){
-            metadataTableText = new Text(context.getConfiguration().get("amino.metadataTable") + IteratorUtils.TEMP_SUFFIX);
+            metadataTableText = new Text(context.getConfiguration().get(AminoConfiguration.TABLE_METADATA) + AminoConfiguration.TEMP_SUFFIX);
         }
 
         private <T extends Metadata & BtMetadata> void writeMutations(Class<T> cls, Iterable<Text> jsonValues, Context context)
@@ -130,9 +128,13 @@ public class DatabasePrepJob extends Configured implements Tool {
     public int run(String[] args) throws Exception {
         System.out.println("\n=============================== DatabasePrepJob ================================\n");
 
+        // Create the command line options to be parsed
+        final Option o1 = new Option("o", "outputDir", true, "The output directory");
+
+        initializeConfigAndOptions(args, Optional.of(Sets.newHashSet(o1)));
         final Configuration conf = getConf();
-//        AminoConfiguration.loadDefault(conf, "AminoDefaults", true);
-        final Job job = new Job(conf, "Amino BT meta importer");
+
+        final Job job = new Job(conf, "Amino Metadata importer");
         job.setJarByClass(this.getClass());
 
         // Get config values
@@ -140,9 +142,12 @@ public class DatabasePrepJob extends Configured implements Tool {
         final String zooKeepers = conf.get(TableConstants.CFG_ZOOKEEPERS);
         final String user = conf.get(TableConstants.CFG_USER);
         final byte[] password = conf.get(TableConstants.CFG_PASSWORD).getBytes("UTF-8");
-        final String metadataTable = conf.get("amino.metadataTable") + IteratorUtils.TEMP_SUFFIX; //You want to make sure you use the temp here even if blastIndex is false
-        final String metadataPaths = StringUtils.join(PathUtils.getJobMetadataPaths(conf, args[0]), ',');
+        final String metadataTable = conf.get(AminoConfiguration.TABLE_METADATA) + AminoConfiguration.TEMP_SUFFIX; //You want to make sure you use the temp here even if blastIndex is false
+        final String metadataPaths = StringUtils.join(PathUtils.getMultipleJobMetadataPaths(conf,
+                fromOptionOrConfig(Optional.of("o"), Optional.of(AminoConfiguration.OUTPUT_DIR))), ',');
+
         System.out.println("Metadata paths: [" + metadataPaths + "].");
+        PathUtils.pathsExists(metadataPaths, conf);
 
         // TODO - Verify that all of the params above were not null
 
@@ -176,11 +181,6 @@ public class DatabasePrepJob extends Configured implements Tool {
     }
 
     public static void main(String[] args) throws Exception {
-        final Configuration conf = new Configuration();
-        conf.set(AminoConfiguration.DEFAULT_CONFIGURATION_PATH_KEY, args[1]); // TODO: use flag instead of positional
-        AminoConfiguration.loadDefault(conf, "AminoDefaults", true);
-
-        int res = ToolRunner.run(conf, new DatabasePrepJob(), args);
-        System.exit(res);
+        System.exit(ToolRunner.run(new DatabasePrepJob(), args));
     }
 }

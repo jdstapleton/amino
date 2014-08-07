@@ -52,6 +52,11 @@ public class AccumuloMetadataService implements AminoMetadataService {
 		this.persistenceService = persistenceService;
 	}
 
+    public AccumuloMetadataService(AccumuloPersistenceService persistenceService, AccumuloGroupService groupService) {
+        this.persistenceService = persistenceService;
+        this.groupService = groupService;
+    }
+
     /**
      * Adds the suffix to all of the tables
      * @param suffix The suffix to append to the tables
@@ -361,6 +366,7 @@ public class AccumuloMetadataService implements AminoMetadataService {
 
 	public Hypothesis createHypothesis(Hypothesis hypothesis, String userId, String[] visibility) throws Exception {
 		hypothesis.created = System.currentTimeMillis();
+        hypothesis.updated = hypothesis.created;
 		return persistHypothesis(hypothesis, userId);
 	}
 

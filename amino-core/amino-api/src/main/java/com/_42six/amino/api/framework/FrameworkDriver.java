@@ -11,10 +11,13 @@ import com._42six.amino.common.util.PathUtils;
 import com._42six.amino.data.*;
 import com._42six.amino.data.impl.EnrichmentDataLoader;
 import com._42six.amino.data.utilities.CacheBuilder;
+import com.google.common.base.Preconditions;
 import org.apache.commons.cli.*;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.mapreduce.Job;
@@ -47,6 +50,19 @@ public final class FrameworkDriver extends Configured implements Tool {
     private String enrichmentOutput = "";
     private static boolean stopOnFirstPhase = false;
 
+    public static final String STATUS_FILE = "status.pid";
+
+    /**
+     * Used to mark the current status of the job.  Currently it is written to HDFS in STATUS_FILE, but might be a good idea
+     * to write it to Zookeeper in the future.
+     */
+    public static enum JobStatus{
+        RUNNING,
+        FAILED,
+        COMPLETE,
+        QUEUED // Not currently used
+    }
+
     static class XMLFileNameFilter implements FilenameFilter {
         public boolean accept(File directory, String filename) {
             return filename.endsWith(".xml");
@@ -58,6 +74,7 @@ public final class FrameworkDriver extends Configured implements Tool {
         Option aminoDefaultConfigurationOption = new Option("d", "amino_default_config_path", true, "The path where the amino default file lives.");
         aminoDefaultConfigurationOption.setRequired(true);
         gnuOptions.addOption(aminoDefaultConfigurationOption);
+        gnuOptions.addOption("b", "base_dir", true, "The base directory of the running job");
         gnuOptions.addOption("c", "amino_config_file_path", true, "A CSV of filenames or paths which will be acted like a classpath setting up configurations!");
         gnuOptions.addOption("stop", "stop_on_first_phase", false, "Stop after the first phase of an AminoEnrichmentJob");
 
@@ -86,16 +103,40 @@ public final class FrameworkDriver extends Configured implements Tool {
         return paths;
     }
 
-    public static void main(String[] args) throws Exception {
-        final CommandLineParser cmdLineGnuParser = new GnuParser();
-        final CommandLine commandLine = cmdLineGnuParser.parse(constructGnuOptions(), args);
+    /**
+     * Load the Configuration file with the values from the command line and config files, and place stuff in the
+     * DistrubutedCacheService as needed
+     *
+     * @param conf The Configuration to populate
+     * @param args The command line arguments
+     * @throws Exception
+     */
+    public static void initalizeConf(Configuration conf, String[] args) throws Exception{
+        // Parse the arguments and make sure the required args are there
+        final CommandLine commandLine;
+        final Options options = constructGnuOptions();
+        try{
+            commandLine = new GnuParser().parse(options, args);
+        } catch (MissingOptionException ex){
+            HelpFormatter help = new HelpFormatter();
+            help.printHelp("hadoop jar <jarFile> " + FrameworkDriver.class.getCanonicalName(), options);
+            return;
+        } catch (Exception ex){
+            ex.printStackTrace();
+            return;
+        }
 
         final String userConfFilePath = commandLine.getOptionValue("amino_config_file_path", "");
         final String aminoDefaultConfigPath = commandLine.getOptionValue("amino_default_config_path");
+        final String baseDir = commandLine.getOptionValue("base_dir");
 
         stopOnFirstPhase = commandLine.hasOption("stop");
 
-        final Configuration conf = new Configuration();
+        // Set the base dir config value if it was provided.
+        if(StringUtils.isNotEmpty(baseDir)){
+            conf.set(AminoConfiguration.BASE_DIR, baseDir);
+        }
+
         conf.set(AminoConfiguration.DEFAULT_CONFIGURATION_PATH_KEY, aminoDefaultConfigPath);
 
         // create a single DistributedCacheService so that multiple cache entries are deduped.
@@ -103,13 +144,14 @@ public final class FrameworkDriver extends Configured implements Tool {
         final DistributedCacheService distributedCacheService = new DistributedCacheService();
 
         // 1. load AminoDefaults
-        AminoConfiguration.loadDefault(conf, "AminoDefaults", true);
+        AminoConfiguration.loadAndMergeWithDefault(conf, true);
         distributedCacheService.addFilesToDistributedCache(conf);
 
         // 2. load user config files, allowing them to overwrite
         if (!StringUtils.isEmpty(userConfFilePath)) {
             for (String path : getUserConfigFiles(userConfFilePath)) {
                 Configuration userConf = new Configuration(false);
+                logger.info("Grabbing configuration information from: " + path);
                 userConf.addResource(new FileInputStream(path));
                 HadoopConfigurationUtils.mergeConfs(conf, userConf);
             }
@@ -122,9 +164,57 @@ public final class FrameworkDriver extends Configured implements Tool {
             conf.set((String) key, (String) propertyOverrides.get(key));
         }
         distributedCacheService.addFilesToDistributedCache(conf);
+    }
+
+    public static void main(String[] args) throws Exception {
+        final Configuration conf = new Configuration();
+        initalizeConf(conf, args);
 
         int res = ToolRunner.run(conf, new FrameworkDriver(), args);
         System.exit(res);
+    }
+
+    /**
+     * Updates the status PID file for the job.
+     *
+     * @param conf The {@link org.apache.hadoop.conf.Configuration} for the map reduce job
+     * @param status The {@link com._42six.amino.api.framework.FrameworkDriver.JobStatus} to change to
+     * @param pidDir The {@link org.apache.hadoop.fs.Path} to the PID file
+     * @throws IOException
+     */
+    public static void updateStatus(Configuration conf, JobStatus status, Path pidDir) throws IOException {
+        final Path pidFile = new Path(pidDir, STATUS_FILE);
+
+        // Create the file if it doesn't exist and overwrite whatever might have been in it
+        try(FileSystem fs = FileSystem.get(conf); FSDataOutputStream os = fs.create(pidFile, true) ){
+            os.writeUTF(status.toString());
+        }
+    }
+
+    /**
+     * Updates the status PID file for the job.
+     *
+     * @param status The {@link com._42six.amino.api.framework.FrameworkDriver.JobStatus} to change to
+     * @param pidDir The {@link org.apache.hadoop.fs.Path} to the PID file
+     * @throws IOException
+     */
+    public void updateStatus(JobStatus status, Path pidDir) throws IOException{
+        final Configuration conf = getConf();
+        FrameworkDriver.updateStatus(conf, status, pidDir);
+    }
+
+    /**
+     * Updates the status PID file for the currently running job.  Uses the currently configured BASE_DIR as the
+     * location of the PID file.
+     *
+     * @param status The {@link com._42six.amino.api.framework.FrameworkDriver.JobStatus} to change to
+     * @throws IOException
+     */
+    public void updateStatus(JobStatus status) throws IOException {
+        final Configuration conf = getConf();
+        final String baseDir = conf.get(AminoConfiguration.BASE_DIR, null);
+        Preconditions.checkNotNull(baseDir, "basedir could not be found in the Amino configuration");
+        updateStatus(status, new Path(baseDir));
     }
 
     public int run(String[] args) throws Exception {
@@ -140,6 +230,8 @@ public final class FrameworkDriver extends Configured implements Tool {
         // AminoConfiguration.loadDefault(conf, "AminoDefaults", true);
         // boolean complete = createTables(conf);
         boolean complete = true;
+
+        updateStatus(JobStatus.RUNNING);
 
         //boolean complete = true;
         for (AminoJob aj : jobs) {
@@ -172,6 +264,8 @@ public final class FrameworkDriver extends Configured implements Tool {
                 }
             }
         }
+
+        updateStatus(complete ? JobStatus.COMPLETE : JobStatus.FAILED);
 
         return complete ? 0 : 1;
     }
